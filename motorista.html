@@ -2,133 +2,76 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Motorista - Enviar Localização</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Motorista - Rastreamento</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      background: #f0f4f8;
-      color: #333;
-      text-align: center;
+      font-family: sans-serif;
+      padding: 20px;
+      background-color: #f0f0f0;
+    }
+    h2 {
+      color: #007bff;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #fff;
+      border: 1px solid #ccc;
     }
     button {
+      padding: 10px 20px;
       background-color: #007bff;
       border: none;
-      padding: 15px 30px;
       color: white;
-      font-size: 1.2em;
-      border-radius: 6px;
+      font-size: 16px;
       cursor: pointer;
-      transition: background-color 0.3s ease;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    #status, #debug {
-      margin-top: 20px;
-      font-weight: bold;
-      min-height: 1.5em;
-      background: #e1e8f7;
-      border-radius: 6px;
-      padding: 10px;
-      text-align: left;
-      font-size: 0.9em;
-      max-height: 150px;
-      overflow-y: auto;
-      white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
-  <h1>Motorista - Rastreamento</h1>
+  <h2>Rastreamento do Motorista</h2>
   <button id="btnIniciar">Iniciar Rastreamento</button>
-  <p id="status">Clique no botão para começar a enviar sua localização.</p>
-  <div id="debug" aria-live="polite" aria-atomic="true"></div>
+  <div id="status">Aguardando início...</div>
 
   <script>
+    const statusDiv = document.getElementById("status");
     const motoristaId = 1;
-    const status = document.getElementById('status');
-    const debug = document.getElementById('debug');
-    let socket;
-    let rastreando = false;
-    let intervaloId;
 
-    function logDebug(msg) {
-      const timestamp = new Date().toLocaleTimeString();
-      debug.textContent += `[${timestamp}] ${msg}\n`;
-      debug.scrollTop = debug.scrollHeight;
-    }
-
-    function conectarWebSocket() {
-      const wsUrl = "wss://hellsapp.onrender.com";
-      socket = new WebSocket(wsUrl);
-
-      socket.onopen = () => {
-        status.textContent = "🟢 WebSocket conectado.";
-        logDebug("WebSocket aberto.");
-      };
-
-      socket.onclose = () => {
-        status.textContent = "🔴 WebSocket desconectado. Tentando reconectar...";
-        logDebug("WebSocket fechado.");
-        setTimeout(conectarWebSocket, 3000);
-      };
-
-      socket.onerror = (err) => {
-        console.error("Erro no WebSocket:", err);
-        status.textContent = "Erro na conexão WebSocket.";
-        logDebug("Erro no WebSocket: " + JSON.stringify(err));
-        socket.close();
-      };
-    }
-
-    function enviarLocalizacao() {
+    document.getElementById("btnIniciar").onclick = () => {
       if (!navigator.geolocation) {
-        alert("Geolocalização não suportada nesse navegador.");
+        statusDiv.textContent = "Geolocalização não é suportada.";
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(position => {
-        const data = {
-          tipo: "localizacao",
-          motorista_id: motoristaId,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        };
+      const socket = new WebSocket("wss://rastreamento-ws.onrender.com");
 
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify(data));
-          status.textContent = `Localização enviada: lat ${data.latitude.toFixed(5)}, lng ${data.longitude.toFixed(5)}`;
-          logDebug("Enviado: " + JSON.stringify(data));
-        } else {
-          status.textContent = "Conexão WebSocket não está aberta.";
-          logDebug("Tentativa de envio, mas WebSocket fechado.");
-        }
-      }, error => {
-        status.textContent = `Erro ao obter localização: ${error.message}`;
-        logDebug(`Erro geolocalização: ${error.message}`);
-      }, {
-        enableHighAccuracy: true
-      });
-    }
+      socket.onopen = () => {
+        statusDiv.textContent = "🟢 Conectado ao servidor. Enviando localização...";
+        setInterval(() => {
+          navigator.geolocation.getCurrentPosition(position => {
+            const data = {
+              tipo: "localizacao",
+              motorista_id: motoristaId,
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            };
+            socket.send(JSON.stringify(data));
+            statusDiv.textContent = `📍 Enviado: ${data.latitude.toFixed(5)}, ${data.longitude.toFixed(5)}`;
+          }, error => {
+            statusDiv.textContent = "Erro ao obter localização: " + error.message;
+          }, { enableHighAccuracy: true });
+        }, 3000);
+      };
 
-    document.getElementById('btnIniciar').addEventListener('click', () => {
-      if (rastreando) {
-        clearInterval(intervaloId);
-        socket.close();
-        rastreando = false;
-        status.textContent = "Rastreamento parado.";
-        logDebug("Rastreamento parado pelo usuário.");
-        document.getElementById('btnIniciar').textContent = "Iniciar Rastreamento";
-      } else {
-        conectarWebSocket();
-        intervaloId = setInterval(enviarLocalizacao, 3000);
-        rastreando = true;
-        status.textContent = "Rastreamento iniciado...";
-        logDebug("Rastreamento iniciado pelo usuário.");
-        document.getElementById('btnIniciar').textContent = "Parar Rastreamento";
-      }
-    });
+      socket.onerror = () => {
+        statusDiv.textContent = "❌ Erro de conexão WebSocket.";
+      };
+
+      socket.onclose = () => {
+        statusDiv.textContent = "⚠️ Conexão WebSocket encerrada.";
+      };
+    };
   </script>
 </body>
 </html>
