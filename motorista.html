@@ -24,10 +24,18 @@
     button:hover {
       background-color: #0056b3;
     }
-    #status {
+    #status, #debug {
       margin-top: 20px;
       font-weight: bold;
       min-height: 1.5em;
+      background: #e1e8f7;
+      border-radius: 6px;
+      padding: 10px;
+      text-align: left;
+      font-size: 0.9em;
+      max-height: 150px;
+      overflow-y: auto;
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -35,31 +43,41 @@
   <h1>Motorista - Rastreamento</h1>
   <button id="btnIniciar">Iniciar Rastreamento</button>
   <p id="status">Clique no botão para começar a enviar sua localização.</p>
+  <div id="debug" aria-live="polite" aria-atomic="true"></div>
 
   <script>
-    const motoristaId = 1; // Ajuste conforme seu sistema
+    const motoristaId = 1;
     const status = document.getElementById('status');
+    const debug = document.getElementById('debug');
     let socket;
     let rastreando = false;
     let intervaloId;
 
+    function logDebug(msg) {
+      const timestamp = new Date().toLocaleTimeString();
+      debug.textContent += `[${timestamp}] ${msg}\n`;
+      debug.scrollTop = debug.scrollHeight;
+    }
+
     function conectarWebSocket() {
-      // Altere para o seu servidor websocket no Render ou outro host
       const wsUrl = "wss://hellsapp.onrender.com";
       socket = new WebSocket(wsUrl);
 
       socket.onopen = () => {
         status.textContent = "🟢 WebSocket conectado.";
+        logDebug("WebSocket aberto.");
       };
 
       socket.onclose = () => {
         status.textContent = "🔴 WebSocket desconectado. Tentando reconectar...";
+        logDebug("WebSocket fechado.");
         setTimeout(conectarWebSocket, 3000);
       };
 
       socket.onerror = (err) => {
         console.error("Erro no WebSocket:", err);
         status.textContent = "Erro na conexão WebSocket.";
+        logDebug("Erro no WebSocket: " + JSON.stringify(err));
         socket.close();
       };
     }
@@ -81,11 +99,14 @@
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify(data));
           status.textContent = `Localização enviada: lat ${data.latitude.toFixed(5)}, lng ${data.longitude.toFixed(5)}`;
+          logDebug("Enviado: " + JSON.stringify(data));
         } else {
           status.textContent = "Conexão WebSocket não está aberta.";
+          logDebug("Tentativa de envio, mas WebSocket fechado.");
         }
       }, error => {
         status.textContent = `Erro ao obter localização: ${error.message}`;
+        logDebug(`Erro geolocalização: ${error.message}`);
       }, {
         enableHighAccuracy: true
       });
@@ -93,18 +114,18 @@
 
     document.getElementById('btnIniciar').addEventListener('click', () => {
       if (rastreando) {
-        // Parar rastreamento
         clearInterval(intervaloId);
         socket.close();
         rastreando = false;
         status.textContent = "Rastreamento parado.";
+        logDebug("Rastreamento parado pelo usuário.");
         document.getElementById('btnIniciar').textContent = "Iniciar Rastreamento";
       } else {
-        // Iniciar rastreamento
         conectarWebSocket();
         intervaloId = setInterval(enviarLocalizacao, 3000);
         rastreando = true;
         status.textContent = "Rastreamento iniciado...";
+        logDebug("Rastreamento iniciado pelo usuário.");
         document.getElementById('btnIniciar').textContent = "Parar Rastreamento";
       }
     });

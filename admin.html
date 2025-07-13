@@ -16,16 +16,22 @@
       color: #007bff;
     }
     #map {
-      height: 80vh;
+      height: 70vh;
       width: 100%;
       border: 1px solid #ccc;
       border-radius: 6px;
     }
-    #info {
+    #info, #debug {
       margin-top: 8px;
       font-size: 0.9em;
       color: #555;
       text-align: center;
+      max-height: 150px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      background: #e7f0ff;
+      border-radius: 6px;
+      padding: 10px;
     }
   </style>
 </head>
@@ -35,6 +41,7 @@
   <div id="info">
     <p id="ultima-atualizacao">Última atualização: --</p>
   </div>
+  <div id="debug" aria-live="polite" aria-atomic="true"></div>
 
   <script>
     let map;
@@ -42,6 +49,13 @@
     const trilhaPorMotorista = {};
     const linhasPorMotorista = {};
     let socket;
+    const debug = document.getElementById('debug');
+
+    function logDebug(msg) {
+      const timestamp = new Date().toLocaleTimeString();
+      debug.textContent += `[${timestamp}] ${msg}\n`;
+      debug.scrollTop = debug.scrollHeight;
+    }
 
     function atualizarUltimaAtualizacao() {
       const agora = new Date();
@@ -63,7 +77,7 @@
     function atualizarMotorista(data) {
       const id = data.motorista_id;
       const pos = { lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) };
-      console.log("Atualizando motorista", id, "posição:", pos);
+      logDebug(`Atualizando motorista ${id} para lat:${pos.lat}, lng:${pos.lng}`);
 
       if (!marcadores[id]) {
         marcadores[id] = new google.maps.Marker({
@@ -72,10 +86,10 @@
           label: `${id}`,
           title: `Motorista ${id}`
         });
-        console.log("Criado marcador para motorista", id);
+        logDebug(`Criado marcador para motorista ${id}`);
       } else {
         marcadores[id].setPosition(pos);
-        console.log("Atualizado marcador para motorista", id);
+        logDebug(`Atualizado marcador para motorista ${id}`);
       }
 
       trilhaPorMotorista[id] = trilhaPorMotorista[id] || [];
@@ -92,44 +106,45 @@
           strokeWeight: 3,
           map: map
         });
-        console.log("Criada linha para motorista", id);
+        logDebug(`Criada linha para motorista ${id}`);
       }
 
       const distancia = calcularDistanciaTotal(trilhaPorMotorista[id]);
-      console.log(`Distância percorrida motorista ${id}: ${distancia.toFixed(1)} m`);
+      logDebug(`Distância percorrida motorista ${id}: ${distancia.toFixed(1)} m`);
 
       atualizarUltimaAtualizacao();
 
-      // Opcional: manter o mapa centrado na última posição recebida
       map.setCenter(pos);
     }
 
     function conectarWebSocket() {
-      // URL do seu servidor websocket hospedado no Render ou outro host
       const wsUrl = "wss://hellsapp.onrender.com";
 
       socket = new WebSocket(wsUrl);
 
-      socket.onopen = () => console.log("🟢 WebSocket conectado");
+      socket.onopen = () => {
+        logDebug("🟢 WebSocket conectado");
+      };
 
       socket.onclose = () => {
-        console.warn("WebSocket desconectado, tentando reconectar em 3 segundos...");
+        logDebug("WebSocket desconectado, tentando reconectar em 3 segundos...");
         setTimeout(conectarWebSocket, 3000);
       };
 
       socket.onerror = (err) => {
-        console.error("Erro no WebSocket:", err);
+        logDebug("Erro no WebSocket: " + err.message || err);
         socket.close();
       };
 
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          logDebug("Mensagem recebida: " + JSON.stringify(data));
           if (data.tipo === "localizacao") {
             atualizarMotorista(data);
           }
         } catch (e) {
-          console.error("Erro ao processar mensagem:", e);
+          logDebug("Erro ao processar mensagem: " + e.message);
         }
       };
     }
@@ -137,7 +152,7 @@
     function initMap() {
       map = new google.maps.Map(document.getElementById("map"), {
         zoom: 15,
-        center: { lat: -15.793889, lng: -47.882778 } // Brasília como centro inicial
+        center: { lat: -15.793889, lng: -47.882778 }
       });
       conectarWebSocket();
     }
