@@ -16,7 +16,7 @@
         return;
       }
 
-      const socket = new WebSocket("ws://https://hellsbrindes.org"); // Atualize para seu servidor real
+const socket = new WebSocket("wss://hellsapp.onrender.com");
 socket.onopen = () => {
   status.textContent = 'Conectado ao servidor, rastreamento iniciado.';
   setInterval(() => {
