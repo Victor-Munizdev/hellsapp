@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8" /><title>Motorista - Rastreamento</title></head>
+<body>
+  <h2>Rastreamento do Motorista</h2>
+  <button id="btnIniciar">Iniciar Rastreamento</button>
+  <p id="status"></p>
+
+  <script>
+    const motoristaId = 1;
+    const status = document.getElementById('status');
+
+    document.getElementById('btnIniciar').onclick = () => {
+      if (!navigator.geolocation) {
+        alert('Geolocalização não suportada neste navegador.');
+        return;
+      }
+
+      const socket = new WebSocket("ws://https://hellsbrindes.org"); // Atualize para seu servidor real
+socket.onopen = () => {
+  status.textContent = 'Conectado ao servidor, rastreamento iniciado.';
+  setInterval(() => {
+    navigator.geolocation.getCurrentPosition(position => {
+      const data = {
+        tipo: "localizacao",
+        motorista_id: motoristaId,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude
+      };
+      socket.send(JSON.stringify(data));
+      console.log('Enviado:', data);
+    }, error => {
+      console.error('Erro ao obter localização:', error.message);
+      status.textContent = 'Erro ao obter localização: ' + error.message;
+    }, { enableHighAccuracy: true });
+  }, 3000);
+};
+
+
+      socket.onerror = e => {
+        console.error('Erro WebSocket:', e);
+        status.textContent = 'Erro na conexão WebSocket.';
+      };
+
+      socket.onclose = () => {
+        status.textContent = 'Conexão WebSocket fechada.';
+      };
+    };
+  </script>
+</body>
+</html>

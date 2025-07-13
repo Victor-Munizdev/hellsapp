@@ -1,0 +1,18 @@
+# Node.js
+node_modules/
+
+MyApp
+
+# Diretórios de build
+platforms/
+plugins/
+build/
+www/
+
+# Configurações do sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos temporários ou de log
+*.log
+*.tmp

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin - Rastreamento em Tempo Real</title>
+  <style>
+    #map {
+      height: 80vh;
+      width: 100%;
+    }
+    #info {
+      font-family: sans-serif;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Rastreamento em Tempo Real - Admin</h2>
+  <div id="map"></div>
+  <div id="info">
+    <p id="ultima-atualizacao">Última atualização: --</p>
+  </div>
+
+  <script>
+    let map;
+    const marcadores = {};
+    const trilhaPorMotorista = {};
+    const linhasPorMotorista = {};
+    let socket;
+
+    function atualizarUltimaAtualizacao() {
+      const agora = new Date();
+      document.getElementById("ultima-atualizacao").textContent = "Última atualização: " + agora.toLocaleTimeString();
+    }
+
+    function calcularDistanciaTotal(coords) {
+      let total = 0;
+      for (let i = 1; i < coords.length; i++) {
+        const a = coords[i - 1], b = coords[i];
+        total += google.maps.geometry.spherical.computeDistanceBetween(
+          new google.maps.LatLng(a.lat, a.lng),
+          new google.maps.LatLng(b.lat, b.lng)
+        );
+      }
+      return total;
+    }
+
+    function atualizarMotorista(data) {
+      const id = data.motorista_id;
+      const pos = { lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) };
+      console.log("Atualizando motorista", id, "posição:", pos);
+
+      if (!marcadores[id]) {
+        marcadores[id] = new google.maps.Marker({
+          position: pos,
+          map: map,
+          label: `${id}`,
+          title: `Motorista ${id}`
+        });
+        console.log("Criado marcador para motorista", id);
+      } else {
+        marcadores[id].setPosition(pos);
+        console.log("Atualizado marcador para motorista", id);
+      }
+
+      trilhaPorMotorista[id] = trilhaPorMotorista[id] || [];
+      trilhaPorMotorista[id].push(pos);
+
+      if (linhasPorMotorista[id]) {
+        linhasPorMotorista[id].setPath(trilhaPorMotorista[id]);
+      } else {
+        linhasPorMotorista[id] = new google.maps.Polyline({
+          path: trilhaPorMotorista[id],
+          geodesic: true,
+          strokeColor: "#007bff",
+          strokeOpacity: 0.6,
+          strokeWeight: 3,
+          map: map
+        });
+        console.log("Criada linha para motorista", id);
+      }
+
+      const distancia = calcularDistanciaTotal(trilhaPorMotorista[id]);
+      document.getElementById("ultima-atualizacao").textContent = `Última atualização: ${new Date().toLocaleTimeString()} - Distância percorrida motorista ${id}: ${distancia.toFixed(1)} m`;
+
+      map.setCenter(pos);
+    }
+
+    function conectarWebSocket() {
+      socket = new WebSocket("ws://localhost:8080");
+
+      socket.onopen = () => console.log("🟢 WebSocket conectado");
+
+      socket.onclose = () => {
+        console.warn("WebSocket desconectado, tentando reconectar em 3 segundos...");
+        setTimeout(conectarWebSocket, 3000);
+      };
+
+      socket.onerror = (err) => {
+        console.error("Erro no WebSocket:", err);
+        socket.close();
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("Recebido:", data);
+          if (data.tipo === "localizacao") {
+            atualizarMotorista(data);
+          }
+        } catch (e) {
+          console.error("Erro ao processar mensagem:", e);
+        }
+      };
+    }
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 15,
+        center: { lat: 0, lng: 0 }
+      });
+      conectarWebSocket();
+    }
+  </script>
+
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPJ2SemdkoFRMJYDF_gJbE8OWKVLYuFzI&libraries=geometry&callback=initMap">
+  </script>
+</body>
+</html>
