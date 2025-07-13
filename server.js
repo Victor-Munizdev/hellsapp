@@ -1,21 +1,19 @@
-const https = require('https');
-const fs = require('fs');
-const WebSocket = require('ws');
+const http = require("http");
+const WebSocket = require("ws");
 
-const server = https.createServer({
-  cert: fs.readFileSync('/caminho/do/certificado/cert.pem'),
-  key: fs.readFileSync('/caminho/do/certificado/key.pem')
-});
+const server = http.createServer(); // NÃO https.createServer()
 
 const wss = new WebSocket.Server({ server });
 
-wss.on('connection', ws => {
-  console.log('Cliente conectado');
-  ws.on('message', message => {
-    console.log('Mensagem recebida:', message);
+wss.on("connection", (ws) => {
+  console.log("Cliente conectado");
+
+  ws.on("message", (msg) => {
+    console.log("Mensagem recebida:", msg);
   });
 });
 
-server.listen(443, () => {
-  console.log('Servidor rodando na porta 443');
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+  console.log(`Servidor WebSocket rodando na porta ${PORT}`);
 });
