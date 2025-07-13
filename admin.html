@@ -4,18 +4,33 @@
   <meta charset="UTF-8" />
   <title>Admin - Rastreamento em Tempo Real</title>
   <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 10px;
+      background: #fff;
+      color: #222;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      color: #007bff;
+    }
     #map {
       height: 80vh;
       width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 6px;
     }
     #info {
-      font-family: sans-serif;
-      padding: 10px;
+      margin-top: 8px;
+      font-size: 0.9em;
+      color: #555;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <h2>Rastreamento em Tempo Real - Admin</h2>
+  <h1>Admin - Rastreamento em Tempo Real</h1>
   <div id="map"></div>
   <div id="info">
     <p id="ultima-atualizacao">Última atualização: --</p>
@@ -81,13 +96,19 @@
       }
 
       const distancia = calcularDistanciaTotal(trilhaPorMotorista[id]);
-      document.getElementById("ultima-atualizacao").textContent = `Última atualização: ${new Date().toLocaleTimeString()} - Distância percorrida motorista ${id}: ${distancia.toFixed(1)} m`;
+      console.log(`Distância percorrida motorista ${id}: ${distancia.toFixed(1)} m`);
 
+      atualizarUltimaAtualizacao();
+
+      // Opcional: manter o mapa centrado na última posição recebida
       map.setCenter(pos);
     }
 
     function conectarWebSocket() {
-      socket = new WebSocket("ws://localhost:8080");
+      // URL do seu servidor websocket hospedado no Render ou outro host
+      const wsUrl = "wss://hellsapp.onrender.com";
+
+      socket = new WebSocket(wsUrl);
 
       socket.onopen = () => console.log("🟢 WebSocket conectado");
 
@@ -104,7 +125,6 @@
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log("Recebido:", data);
           if (data.tipo === "localizacao") {
             atualizarMotorista(data);
           }
@@ -117,7 +137,7 @@
     function initMap() {
       map = new google.maps.Map(document.getElementById("map"), {
         zoom: 15,
-        center: { lat: 0, lng: 0 }
+        center: { lat: -15.793889, lng: -47.882778 } // Brasília como centro inicial
       });
       conectarWebSocket();
     }

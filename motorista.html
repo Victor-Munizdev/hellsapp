@@ -1,51 +1,113 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="UTF-8" /><title>Motorista - Rastreamento</title></head>
+<head>
+  <meta charset="UTF-8" />
+  <title>Motorista - Enviar Localização</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f0f4f8;
+      color: #333;
+      text-align: center;
+    }
+    button {
+      background-color: #007bff;
+      border: none;
+      padding: 15px 30px;
+      color: white;
+      font-size: 1.2em;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+      min-height: 1.5em;
+    }
+  </style>
+</head>
 <body>
-  <h2>Rastreamento do Motorista</h2>
+  <h1>Motorista - Rastreamento</h1>
   <button id="btnIniciar">Iniciar Rastreamento</button>
-  <p id="status"></p>
+  <p id="status">Clique no botão para começar a enviar sua localização.</p>
 
   <script>
-    const motoristaId = 1;
+    const motoristaId = 1; // Ajuste conforme seu sistema
     const status = document.getElementById('status');
+    let socket;
+    let rastreando = false;
+    let intervaloId;
 
-    document.getElementById('btnIniciar').onclick = () => {
-      if (!navigator.geolocation) {
-        alert('Geolocalização não suportada neste navegador.');
-        return;
-      }
+    function conectarWebSocket() {
+      // Altere para o seu servidor websocket no Render ou outro host
+      const wsUrl = "wss://hellsapp.onrender.com";
+      socket = new WebSocket(wsUrl);
 
-const socket = new WebSocket("wss://hellsapp.onrender.com");
-socket.onopen = () => {
-  status.textContent = 'Conectado ao servidor, rastreamento iniciado.';
-  setInterval(() => {
-    navigator.geolocation.getCurrentPosition(position => {
-      const data = {
-        tipo: "localizacao",
-        motorista_id: motoristaId,
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude
-      };
-      socket.send(JSON.stringify(data));
-      console.log('Enviado:', data);
-    }, error => {
-      console.error('Erro ao obter localização:', error.message);
-      status.textContent = 'Erro ao obter localização: ' + error.message;
-    }, { enableHighAccuracy: true });
-  }, 3000);
-};
-
-
-      socket.onerror = e => {
-        console.error('Erro WebSocket:', e);
-        status.textContent = 'Erro na conexão WebSocket.';
+      socket.onopen = () => {
+        status.textContent = "🟢 WebSocket conectado.";
       };
 
       socket.onclose = () => {
-        status.textContent = 'Conexão WebSocket fechada.';
+        status.textContent = "🔴 WebSocket desconectado. Tentando reconectar...";
+        setTimeout(conectarWebSocket, 3000);
       };
-    };
+
+      socket.onerror = (err) => {
+        console.error("Erro no WebSocket:", err);
+        status.textContent = "Erro na conexão WebSocket.";
+        socket.close();
+      };
+    }
+
+    function enviarLocalizacao() {
+      if (!navigator.geolocation) {
+        alert("Geolocalização não suportada nesse navegador.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(position => {
+        const data = {
+          tipo: "localizacao",
+          motorista_id: motoristaId,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify(data));
+          status.textContent = `Localização enviada: lat ${data.latitude.toFixed(5)}, lng ${data.longitude.toFixed(5)}`;
+        } else {
+          status.textContent = "Conexão WebSocket não está aberta.";
+        }
+      }, error => {
+        status.textContent = `Erro ao obter localização: ${error.message}`;
+      }, {
+        enableHighAccuracy: true
+      });
+    }
+
+    document.getElementById('btnIniciar').addEventListener('click', () => {
+      if (rastreando) {
+        // Parar rastreamento
+        clearInterval(intervaloId);
+        socket.close();
+        rastreando = false;
+        status.textContent = "Rastreamento parado.";
+        document.getElementById('btnIniciar').textContent = "Iniciar Rastreamento";
+      } else {
+        // Iniciar rastreamento
+        conectarWebSocket();
+        intervaloId = setInterval(enviarLocalizacao, 3000);
+        rastreando = true;
+        status.textContent = "Rastreamento iniciado...";
+        document.getElementById('btnIniciar').textContent = "Parar Rastreamento";
+      }
+    });
   </script>
 </body>
 </html>
