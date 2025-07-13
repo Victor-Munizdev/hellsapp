@@ -1,19 +1,37 @@
-const http = require("http");
-const WebSocket = require("ws");
+const express = require('express');
+const cors = require('cors');
 
-const server = http.createServer(); // NÃO https.createServer()
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-const wss = new WebSocket.Server({ server });
+// Armazenar dados em memória (substitua por DB real depois)
+let localizacoes = [];
 
-wss.on("connection", (ws) => {
-  console.log("Cliente conectado");
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-  ws.on("message", (msg) => {
-    console.log("Mensagem recebida:", msg);
-  });
+// Rota para receber localização do motorista (POST)
+app.post('/api/localizacao', (req, res) => {
+  const { motorista_id, latitude, longitude, timestamp } = req.body;
+  if (!motorista_id || !latitude || !longitude) {
+    return res.status(400).json({ error: 'Dados incompletos' });
+  }
+  // Salva a localização
+  localizacoes.push({ motorista_id, latitude, longitude, timestamp: timestamp || Date.now() });
+
+  // Para não crescer sem controle, mantemos só as últimas 100 localizações
+  if (localizacoes.length > 100) localizacoes.shift();
+
+  res.json({ status: 'ok' });
 });
 
-const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => {
-  console.log(`Servidor WebSocket rodando na porta ${PORT}`);
+// Rota para obter as localizações (GET)
+app.get('/api/localizacoes', (req, res) => {
+  res.json(localizacoes);
+});
+
+// Iniciar servidor
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });

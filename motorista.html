@@ -1,77 +1,67 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Motorista - Rastreamento</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-      background-color: #f0f0f0;
-    }
-    h2 {
-      color: #007bff;
-    }
-    #status {
-      margin-top: 20px;
-      padding: 10px;
-      background-color: #fff;
-      border: 1px solid #ccc;
-    }
-    button {
-      padding: 10px 20px;
-      background-color: #007bff;
-      border: none;
-      color: white;
-      font-size: 16px;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>Motorista - Enviar Localização</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  button { padding: 10px 20px; font-size: 16px; }
+  #status { margin-top: 15px; color: green; }
+  #error { margin-top: 15px; color: red; }
+</style>
 </head>
 <body>
-  <h2>Rastreamento do Motorista</h2>
-  <button id="btnIniciar">Iniciar Rastreamento</button>
-  <div id="status">Aguardando início...</div>
+  <h2>Motorista - Enviar Localização</h2>
+  <button id="startBtn">Iniciar envio da localização</button>
+  <p id="status">Status: parado</p>
+  <p id="error"></p>
 
-  <script>
-    const statusDiv = document.getElementById("status");
-    const motoristaId = 1;
+<script>
+  const startBtn = document.getElementById('startBtn');
+  const statusEl = document.getElementById('status');
+  const errorEl = document.getElementById('error');
+  let watchId = null;
 
-    document.getElementById("btnIniciar").onclick = () => {
-      if (!navigator.geolocation) {
-        statusDiv.textContent = "Geolocalização não é suportada.";
-        return;
-      }
+  startBtn.onclick = () => {
+    if (!navigator.geolocation) {
+      errorEl.textContent = 'Geolocalização não suportada neste navegador.';
+      return;
+    }
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      statusEl.textContent = 'Status: parado';
+      startBtn.textContent = 'Iniciar envio da localização';
+      return;
+    }
+    startBtn.textContent = 'Parar envio da localização';
+    errorEl.textContent = '';
+    statusEl.textContent = 'Status: enviando...';
 
-      const socket = new WebSocket("wss://rastreamento-ws.onrender.com");
-
-      socket.onopen = () => {
-        statusDiv.textContent = "🟢 Conectado ao servidor. Enviando localização...";
-        setInterval(() => {
-          navigator.geolocation.getCurrentPosition(position => {
-            const data = {
-              tipo: "localizacao",
-              motorista_id: motoristaId,
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude
-            };
-            socket.send(JSON.stringify(data));
-            statusDiv.textContent = `📍 Enviado: ${data.latitude.toFixed(5)}, ${data.longitude.toFixed(5)}`;
-          }, error => {
-            statusDiv.textContent = "Erro ao obter localização: " + error.message;
-          }, { enableHighAccuracy: true });
-        }, 3000);
+    watchId = navigator.geolocation.watchPosition(pos => {
+      const data = {
+        motorista_id: 1,  // ajuste conforme sua lógica
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude
       };
 
-      socket.onerror = () => {
-        statusDiv.textContent = "❌ Erro de conexão WebSocket.";
-      };
-
-      socket.onclose = () => {
-        statusDiv.textContent = "⚠️ Conexão WebSocket encerrada.";
-      };
-    };
-  </script>
+      fetch('https://hellsbrindes.org/salvar_localizacao.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('Erro no envio');
+        statusEl.textContent = `Status: posição enviada: lat ${data.latitude.toFixed(5)}, lng ${data.longitude.toFixed(5)}`;
+      })
+      .catch(err => {
+        errorEl.textContent = 'Erro ao enviar localização: ' + err.message;
+      });
+    }, err => {
+      errorEl.textContent = 'Erro ao obter localização: ' + err.message;
+      statusEl.textContent = 'Status: erro';
+    }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 });
+  };
+</script>
 </body>
 </html>

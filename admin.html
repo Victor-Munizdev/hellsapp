@@ -1,121 +1,64 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin - Rastreamento em Tempo Real</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background-color: #f8f9fa;
-      margin: 0;
-    }
-    h2 {
-      padding: 10px;
-      background-color: #007bff;
-      color: white;
-      margin: 0;
-    }
-    #map {
-      height: 80vh;
-      width: 100%;
-    }
-    #info {
-      padding: 10px;
-      font-size: 14px;
-      background: #fff;
-      border-top: 1px solid #ccc;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>Admin - Rastreamento em Tempo Real</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 0; }
+  #map { height: 90vh; width: 100%; }
+  #info { padding: 10px; background: #f0f0f0; font-size: 16px; }
+</style>
 </head>
 <body>
-  <h2>Rastreamento em Tempo Real - Admin</h2>
+  <h2>Admin - Rastreamento em Tempo Real</h2>
+  <div id="info">Última atualização: <span id="ultima-atualizacao">--</span></div>
   <div id="map"></div>
-  <div id="info">
-    <p id="ultima-atualizacao">Última atualização: --</p>
-  </div>
 
   <script>
     let map;
-    const marcadores = {};
-    const trilhaPorMotorista = {};
-    const linhasPorMotorista = {};
-
-    function atualizarMotorista(data) {
-      const id = data.motorista_id;
-      const pos = { lat: parseFloat(data.latitude), lng: parseFloat(data.longitude) };
-
-      if (!marcadores[id]) {
-        marcadores[id] = new google.maps.Marker({
-          position: pos,
-          map: map,
-          label: `${id}`,
-          title: `Motorista ${id}`
-        });
-      } else {
-        marcadores[id].setPosition(pos);
-      }
-
-      trilhaPorMotorista[id] = trilhaPorMotorista[id] || [];
-      trilhaPorMotorista[id].push(pos);
-
-      if (linhasPorMotorista[id]) {
-        linhasPorMotorista[id].setPath(trilhaPorMotorista[id]);
-      } else {
-        linhasPorMotorista[id] = new google.maps.Polyline({
-          path: trilhaPorMotorista[id],
-          geodesic: true,
-          strokeColor: "#007bff",
-          strokeOpacity: 0.6,
-          strokeWeight: 3,
-          map: map
-        });
-      }
-
-      const agora = new Date().toLocaleTimeString();
-      document.getElementById("ultima-atualizacao").textContent =
-        `🕒 Última atualização: ${agora} | ID: ${id} | Latitude: ${pos.lat.toFixed(5)} | Longitude: ${pos.lng.toFixed(5)}`;
-
-      map.setCenter(pos);
-    }
-
-    function conectarWebSocket() {
-      const socket = new WebSocket("wss://rastreamento-ws.onrender.com");
-
-      socket.onopen = () => console.log("🟢 WebSocket conectado");
-
-      socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.tipo === "localizacao") {
-            atualizarMotorista(data);
-          }
-        } catch (e) {
-          console.error("Erro ao processar mensagem:", e);
-        }
-      };
-
-      socket.onerror = (err) => {
-        console.error("❌ Erro WebSocket:", err);
-      };
-
-      socket.onclose = () => {
-        console.warn("⚠️ WebSocket desconectado. Tentando reconectar em 3s...");
-        setTimeout(conectarWebSocket, 3000);
-      };
+    let markers = {};
+    
+    function atualizarUltimaAtualizacao() {
+      const agora = new Date();
+      document.getElementById('ultima-atualizacao').textContent = agora.toLocaleTimeString();
     }
 
     function initMap() {
-      map = new google.maps.Map(document.getElementById("map"), {
+      map = new google.maps.Map(document.getElementById('map'), {
         zoom: 14,
-        center: { lat: -15.793889, lng: -47.882778 } // Posição inicial (Brasília)
+        center: { lat: -15.793889, lng: -47.882778 } // Centro inicial (Brasília)
       });
-      conectarWebSocket();
+      atualizarPosicoes();
+      setInterval(atualizarPosicoes, 3000);
+    }
+
+    function atualizarPosicoes() {
+      fetch('https://hellsbrindes.org/pegar_localizacoes.php')
+        .then(res => res.json())
+        .then(data => {
+          // data esperado: [{ motorista_id, latitude, longitude }, ...]
+          for (const pos of data) {
+            const id = pos.motorista_id;
+            const latLng = new google.maps.LatLng(parseFloat(pos.latitude), parseFloat(pos.longitude));
+            if (markers[id]) {
+              markers[id].setPosition(latLng);
+            } else {
+              markers[id] = new google.maps.Marker({
+                position: latLng,
+                map: map,
+                label: id.toString(),
+                title: `Motorista ${id}`
+              });
+            }
+          }
+          atualizarUltimaAtualizacao();
+        })
+        .catch(err => console.error('Erro ao buscar localizações:', err));
     }
   </script>
 
   <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPJ2SemdkoFRMJYDF_gJbE8OWKVLYuFzI&libraries=geometry&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPJ2SemdkoFRMJYDF_gJbE8OWKVLYuFzI&callback=initMap">
   </script>
 </body>
 </html>
